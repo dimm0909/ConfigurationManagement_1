@@ -1,4 +1,5 @@
 # Вариант №29
+import copy
 import datetime
 import getpass
 import os
@@ -153,6 +154,39 @@ class VFS:
             return f"touch: {path}: Not a directory"
 
         parent[name] = ""
+        return None
+
+    def cp(self, src, dst):
+        source_node = self.get_node(src)
+        if source_node is None:
+            return f"cp: cannot stat '{src}': No such file or directory"
+
+        dst_abs = self._normalize_path(dst)
+        dst_parent, dst_name = self.get_parent_and_name(dst)
+
+        dst_is_dir = False
+        if dst_name is None:
+            dst_parent = self.root
+            dst_name = os.path.basename(self._normalize_path(src))
+            dst_is_dir = True
+        else:
+            existing_dst = self.get_node(dst)
+            if existing_dst is not None and isinstance(existing_dst, dict):
+                dst_is_dir = True
+                dst_parent = existing_dst
+                dst_name = os.path.basename(self._normalize_path(src))
+
+        if dst_parent is None:
+            return f"cp: cannot create file '{dst}': No such file or directory"
+        if not isinstance(dst_parent, dict):
+            return f"cp: cannot create file '{dst}': Not a directory"
+
+        if not isinstance(source_node, dict):
+            if dst_parent is self.get_node(os.path.dirname(self._normalize_path(src))) and dst_name == os.path.basename(
+                    self._normalize_path(src)):
+                return f"cp: '{src}' and '{dst}' are the same file"
+
+        dst_parent[dst_name] = copy.deepcopy(source_node)
         return None
 
 
@@ -320,6 +354,21 @@ def execute(command, vfs):
         for match in sorted(matches):
             print(match)
         return True
+
+    elif cmd == "cp":
+        if len(args) < 2:
+            print("cp: missing file operand")
+            return False
+
+        src = args[0]
+        dst = args[1]
+
+        result = vfs.cp(src, dst)
+        if result:
+            print(result)
+            return False
+        return True
+
     else:
         print(f"Error: unknown command '{cmd}'")
         return False
