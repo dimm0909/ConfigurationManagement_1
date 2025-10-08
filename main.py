@@ -1,5 +1,6 @@
 # Вариант №29
-
+import datetime
+import getpass
 import os
 import socket
 import shutil
@@ -212,6 +213,112 @@ def execute(command, vfs):
         except Exception as e:
             print(f"vfs-save: error saving to {save_path}: {e}")
             return False
+        return True
+
+    elif cmd == "who":
+        user = getpass.getuser()
+        host = socket.gethostname()
+        print(f"{user} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} ({host})")
+        return True
+    elif cmd == "cal":
+        now = datetime.datetime.now()
+        year = now.year
+        month = now.month
+
+        if args:
+            try:
+                if len(args) == 1:
+                    month = int(args[0])
+                    if not (1 <= month <= 12):
+                        print("cal: invalid month")
+                        return False
+                elif len(args) == 2:
+                    month = int(args[0])
+                    year = int(args[1])
+                    if not (1 <= month <= 12):
+                        print("cal: invalid month")
+                        return False
+                    if year < 1 or year > 9999:
+                        print("cal: invalid year")
+                        return False
+                else:
+                    print("cal: too many arguments")
+                    return False
+            except ValueError:
+                print("cal: invalid number")
+                return False
+
+        import calendar
+        cal_str = calendar.month(year, month)
+        print(cal_str)
+        return True
+    elif cmd == "find":
+        if not args:
+            path = "."
+            pattern = ""
+        elif len(args) == 1:
+            if args[0].startswith("-name"):
+                print("find: invalid usage. Use: find [path] -name pattern")
+                return False
+            else:
+                path = args[0]
+                pattern = ""
+        elif len(args) >= 3 and args[1] == "-name":
+            path = args[0]
+            pattern = args[2]
+        else:
+            print("find: invalid usage. Use: find [path] -name pattern")
+            return False
+
+        start_node = vfs.get_node(path)
+        if start_node is None:
+            print(f"find: '{path}': No such file or directory")
+            return False
+
+        start_abs_path = vfs._normalize_path(path)
+        if start_abs_path == "/":
+            start_display_path = ""
+        else:
+            start_display_path = start_abs_path
+
+        matches = []
+
+        def match_name(name, pattern):
+            if not pattern:
+                return True
+            if '*' not in pattern:
+                return name == pattern
+            if pattern == "*":
+                return True
+            if pattern.startswith("*") and pattern.endswith("*"):
+                substr = pattern[1:-1]
+                return substr in name
+            elif pattern.startswith("*"):
+                suffix = pattern[1:]
+                return name.endswith(suffix)
+            elif pattern.endswith("*"):
+                prefix = pattern[:-1]
+                return name.startswith(prefix)
+            else:
+                return name == pattern
+
+        def walk(node, current_path):
+            for name, content in node.items():
+                full_path = f"{current_path}/{name}".replace("//", "/")
+                if match_name(name, pattern):
+                    matches.append(full_path)
+                if isinstance(content, dict):
+                    walk(content, full_path)
+
+        if isinstance(start_node, dict):
+            walk(start_node, start_display_path)
+        else:
+            name = os.path.basename(start_abs_path)
+            if match_name(name, pattern):
+                matches.append(start_abs_path)
+
+        for match in sorted(matches):
+            print(match)
         return True
     else:
         print(f"Error: unknown command '{cmd}'")
