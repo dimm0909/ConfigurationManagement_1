@@ -1,2 +1,7 @@
-ls 12345
-cd dddd
+mkdir hehe
+cd hehe
+mkdir not_hehe
+cd not_hehe
+touch file1.txt
+touch file2.txt
+ls
